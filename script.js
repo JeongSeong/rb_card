@@ -678,14 +678,20 @@ class DepressionScoreCard extends HTMLElement {
                         >
                           <span>${point.emoji}</span>
                         </button>
-                        <div class="chart-day" style="left:${(point.x / width) * 100}%; top: calc(${(point.y / height) * 100}% + 36px);">
-                          ${point.day}
-                        </div>
                       `
                     )
                     .join("")
                 : ""
             }
+            ${points
+              .map(
+                (point) => `
+                  <div class="chart-day" style="left:${(point.x / width) * 100}%;">
+                    ${point.day}
+                  </div>
+                `
+              )
+              .join("")}
           </div>
         </div>
       </div>

@@ -302,6 +302,7 @@ body {
 
 .chart-day {
   position: absolute;
+  bottom: -34px;
   transform: translateX(-50%);
   color: #97a097;
   font-size: 13px;
