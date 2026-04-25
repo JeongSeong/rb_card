@@ -8,6 +8,36 @@ const WEEK_TREND = [
   { day: "일", score: 6, emoji: "☺️", color: "#c8f1d8", dateKey: "2026-04-19" },
 ];
 
+const DIALOGUE_WEEK_TREND = [
+  { score: 8, dateKey: "2026-04-13" },
+  { score: 18, dateKey: "2026-04-14" },
+  { score: 11, dateKey: "2026-04-15" },
+  { score: 7, dateKey: "2026-04-16" },
+  { score: 16, dateKey: "2026-04-17" },
+  { score: 14, dateKey: "2026-04-18" },
+  { score: 9, dateKey: "2026-04-19" },
+];
+
+const PREVIOUS_WEEK_DIARY_SCORES = [7, 12, 9, 15, 8, 13, 10];
+const PREVIOUS_WEEK_DIALOGUE_SCORES = [6, 10, 14, 9, 12, 15, 11];
+
+const PREVIOUS_WEEK_TREND = WEEK_TREND.map((item, index) => ({
+  ...item,
+  score: PREVIOUS_WEEK_DIARY_SCORES[index],
+  dateKey: shiftDateKey(item.dateKey, -7),
+}));
+
+const PREVIOUS_DIALOGUE_WEEK_TREND = DIALOGUE_WEEK_TREND.map((item, index) => ({
+  ...item,
+  score: PREVIOUS_WEEK_DIALOGUE_SCORES[index],
+  dateKey: shiftDateKey(item.dateKey, -7),
+}));
+
+const WEEK_TREND_HISTORY = [...PREVIOUS_WEEK_TREND, ...WEEK_TREND];
+const DIALOGUE_WEEK_TREND_HISTORY = [...PREVIOUS_DIALOGUE_WEEK_TREND, ...DIALOGUE_WEEK_TREND];
+const WEEK_WINDOW_SIZE = 7;
+const MAX_WEEK_WINDOW_OFFSET = WEEK_TREND_HISTORY.length - WEEK_WINDOW_SIZE;
+
 const WEEKDAY_BADGE_COLORS = {
   월: "#ffe9a8",
   화: "#ffc1c4",
@@ -226,6 +256,17 @@ const MONTH_TREND = buildDenseTrend(
   6
 );
 
+const DIALOGUE_MONTH_TREND = buildDenseTrend(
+  [
+    { label: "1주", score: 8 },
+    { label: "2주", score: 16 },
+    { label: "3주", score: 11 },
+    { label: "4주", score: 18 },
+    { label: "5주", score: 12 },
+  ],
+  6
+);
+
 const YEAR_TREND = buildDenseTrend(
   [
     { label: "1월", score: 11 },
@@ -244,14 +285,70 @@ const YEAR_TREND = buildDenseTrend(
   29
 );
 
+const DIALOGUE_YEAR_TREND = buildDenseTrend(
+  [
+    { label: "1월", score: 9 },
+    { label: "2월", score: 12 },
+    { label: "3월", score: 14 },
+    { label: "4월", score: 16 },
+    { label: "5월", score: 10 },
+    { label: "6월", score: 8 },
+    { label: "7월", score: 11 },
+    { label: "8월", score: 15 },
+    { label: "9월", score: 13 },
+    { label: "10월", score: 17 },
+    { label: "11월", score: 10 },
+    { label: "12월", score: 8 },
+  ],
+  29
+);
+
+const MONTH_WINDOW_STEP = 7;
+const MONTH_WINDOW_SIZE = MONTH_TREND.length;
+const MONTH_TREND_HISTORY = [...createShiftedTrend(MONTH_TREND, -2), ...MONTH_TREND];
+const DIALOGUE_MONTH_TREND_HISTORY = [
+  ...createShiftedTrend(DIALOGUE_MONTH_TREND, -1),
+  ...DIALOGUE_MONTH_TREND,
+];
+const MAX_MONTH_WINDOW_OFFSET = Math.floor((MONTH_TREND_HISTORY.length - MONTH_WINDOW_SIZE) / MONTH_WINDOW_STEP);
+
+const YEAR_WINDOW_STEP = 30;
+const YEAR_WINDOW_SIZE = YEAR_TREND.length;
+const YEAR_TREND_HISTORY = [...createShiftedTrend(YEAR_TREND, 2), ...YEAR_TREND];
+const DIALOGUE_YEAR_TREND_HISTORY = [
+  ...createShiftedTrend(DIALOGUE_YEAR_TREND, -2),
+  ...DIALOGUE_YEAR_TREND,
+];
+const MAX_YEAR_WINDOW_OFFSET = Math.floor((YEAR_TREND_HISTORY.length - YEAR_WINDOW_SIZE) / YEAR_WINDOW_STEP);
+
 function sortByLatest(items) {
   return [...items].sort((left, right) => new Date(right.writtenAt) - new Date(left.writtenAt));
 }
 
-function createLineMarkup(data, width, height, bottomPadding = 20) {
+function createShiftedTrend(data, scoreOffset) {
+  return data.map((point, index) => ({
+    ...point,
+    score: clampScore(point.score + scoreOffset + (index % 3 === 0 ? 1 : 0)),
+  }));
+}
+
+function shiftDateKey(dateKey, dayOffset) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + dayOffset);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function createLineMarkup(data, width, height, bottomPadding = 20, options = {}) {
   const maxScore = 27;
   const usableHeight = height - bottomPadding;
   const lastIndex = Math.max(data.length - 1, 1);
+  const stroke = options.stroke || "#2c2f31";
+  const strokeWidth = options.strokeWidth || 1.5;
+  const className = options.className ? ` class="${options.className}"` : "";
 
   const points = data.map((item, index) => {
     const x = (index / lastIndex) * width;
@@ -261,7 +358,7 @@ function createLineMarkup(data, width, height, bottomPadding = 20) {
 
   return {
     points,
-    polyline: `<polyline fill="none" stroke="#2c2f31" stroke-width="1.5" points="${points
+    polyline: `<polyline${className} fill="none" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" points="${points
       .map((point) => `${point.x},${point.y}`)
       .join(" ")}" />`,
   };
@@ -274,6 +371,11 @@ class DepressionScoreCard extends HTMLElement {
     this.expandedRange = "month";
     this.isModalOpen = false;
     this.selectedDateKey = "";
+    this.weekWindowIndex = 0;
+    this.expandedWindowOffset = {
+      month: 0,
+      year: 0,
+    };
   }
 
   connectedCallback() {
@@ -306,7 +408,62 @@ class DepressionScoreCard extends HTMLElement {
   }
 
   getExpandedData() {
-    return this.expandedRange === "year" ? YEAR_TREND : MONTH_TREND;
+    if (this.expandedRange === "year") {
+      const startIndex = YEAR_TREND_HISTORY.length - YEAR_WINDOW_SIZE - this.expandedWindowOffset.year * YEAR_WINDOW_STEP;
+      const endIndex = startIndex + YEAR_WINDOW_SIZE;
+
+      return {
+        diary: YEAR_TREND_HISTORY.slice(startIndex, endIndex),
+        dialogue: DIALOGUE_YEAR_TREND_HISTORY.slice(startIndex, endIndex),
+      };
+    }
+
+    const startIndex = MONTH_TREND_HISTORY.length - MONTH_WINDOW_SIZE - this.expandedWindowOffset.month * MONTH_WINDOW_STEP;
+    const endIndex = startIndex + MONTH_WINDOW_SIZE;
+
+    return {
+      diary: MONTH_TREND_HISTORY.slice(startIndex, endIndex),
+      dialogue: DIALOGUE_MONTH_TREND_HISTORY.slice(startIndex, endIndex),
+    };
+  }
+
+  getExpandedMoveLimit() {
+    return this.expandedRange === "year" ? MAX_YEAR_WINDOW_OFFSET : MAX_MONTH_WINDOW_OFFSET;
+  }
+
+  getCurrentWeekTrend() {
+    const startIndex = MAX_WEEK_WINDOW_OFFSET - this.weekWindowIndex;
+    const endIndex = startIndex + WEEK_WINDOW_SIZE;
+
+    return {
+      label: "요일 이동",
+      diary: WEEK_TREND_HISTORY.slice(startIndex, endIndex),
+      dialogue: DIALOGUE_WEEK_TREND_HISTORY.slice(startIndex, endIndex),
+    };
+  }
+
+  getVisibleChartTypes() {
+    return {
+      diary: this.activeTab !== "dialogue",
+      dialogue: this.activeTab !== "diary",
+    };
+  }
+
+  renderChartLegend(visibleTypes, className = "chart-legend") {
+    return `
+      <div class="${className}" aria-label="그래프 범례">
+        ${
+          visibleTypes.diary
+            ? `<span><i class="chart-legend__swatch chart-legend__swatch--diary"></i>일기</span>`
+            : ""
+        }
+        ${
+          visibleTypes.dialogue
+            ? `<span><i class="chart-legend__swatch chart-legend__swatch--dialogue"></i>대화</span>`
+            : ""
+        }
+      </div>
+    `;
   }
 
   bindEvents() {
@@ -328,9 +485,27 @@ class DepressionScoreCard extends HTMLElement {
         return;
       }
 
+      const weekMove = event.target.closest("[data-week-move]");
+      if (weekMove) {
+        const nextIndex = this.weekWindowIndex + Number(weekMove.dataset.weekMove);
+        this.weekWindowIndex = Math.max(0, Math.min(MAX_WEEK_WINDOW_OFFSET, nextIndex));
+        this.selectedDateKey = "";
+        this.render();
+        return;
+      }
+
       const rangeTab = event.target.closest("[data-range]");
       if (rangeTab) {
         this.expandedRange = rangeTab.dataset.range;
+        this.render();
+        return;
+      }
+
+      const expandedMove = event.target.closest("[data-expanded-move]");
+      if (expandedMove) {
+        const range = this.expandedRange;
+        const nextOffset = this.expandedWindowOffset[range] + Number(expandedMove.dataset.expandedMove);
+        this.expandedWindowOffset[range] = Math.max(0, Math.min(this.getExpandedMoveLimit(), nextOffset));
         this.render();
         return;
       }
@@ -416,12 +591,53 @@ class DepressionScoreCard extends HTMLElement {
   renderMainChart() {
     const width = 680;
     const height = 138;
-    const { points, polyline } = createLineMarkup(WEEK_TREND, width, height, 0);
+    const visibleTypes = this.getVisibleChartTypes();
+    const weekTrend = this.getCurrentWeekTrend();
+    const canMovePrevious = this.weekWindowIndex < MAX_WEEK_WINDOW_OFFSET;
+    const canMoveRecent = this.weekWindowIndex > 0;
+    const { points, polyline: diaryPolyline } = createLineMarkup(weekTrend.diary, width, height, 0, {
+      stroke: "#2c2f31",
+      strokeWidth: 1.7,
+      className: "chart-line__path chart-line__path--diary",
+    });
+    const { points: dialoguePoints, polyline: dialoguePolyline } = createLineMarkup(
+      weekTrend.dialogue,
+      width,
+      height,
+      0,
+      {
+        stroke: "#5f8eea",
+        strokeWidth: 1.7,
+        className: "chart-line__path chart-line__path--dialogue",
+      }
+    );
 
     return `
       <div class="chart-shell">
         <div class="chart-toolbar">
-          <button class="expand-button" type="button" data-open-modal>크게보기</button>
+          ${this.renderChartLegend(visibleTypes)}
+          <div class="chart-actions">
+            <button
+              class="chart-nav-button"
+              type="button"
+              data-week-move="1"
+              aria-label="이전 요일 그래프 보기"
+              ${canMovePrevious ? "" : "disabled"}
+            >
+              ‹
+            </button>
+            <span class="chart-window-label">${weekTrend.label}</span>
+            <button
+              class="chart-nav-button"
+              type="button"
+              data-week-move="-1"
+              aria-label="최근 요일 그래프 보기"
+              ${canMoveRecent ? "" : "disabled"}
+            >
+              ›
+            </button>
+            <button class="expand-button" type="button" data-open-modal>크게보기</button>
+          </div>
         </div>
         <div class="chart-panel">
           <div class="chart-scale">
@@ -431,26 +647,45 @@ class DepressionScoreCard extends HTMLElement {
           </div>
           <div class="chart-area">
             <svg class="chart-line" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
-              ${polyline}
+              ${visibleTypes.diary ? diaryPolyline : ""}
+              ${visibleTypes.dialogue ? dialoguePolyline : ""}
             </svg>
-            ${points
-              .map(
-                (point) => `
-                  <button
-                    class="chart-marker ${this.selectedDateKey === point.dateKey ? "is-active" : ""}"
-                    type="button"
-                    data-day-filter="${point.dateKey}"
-                    aria-label="${point.day}요일 기록 보기"
-                    style="left:${(point.x / width) * 100}%; top:${(point.y / height) * 100}%; background:${point.color};"
-                  >
-                    <span>${point.emoji}</span>
-                  </button>
-                  <div class="chart-day" style="left:${(point.x / width) * 100}%; top: calc(${(point.y / height) * 100}% + 36px);">
-                    ${point.day}
-                  </div>
-                `
-              )
-              .join("")}
+            ${
+              visibleTypes.dialogue
+                ? dialoguePoints
+                    .map(
+                      (point) => `
+                        <span
+                          class="chart-dialogue-point"
+                          style="left:${(point.x / width) * 100}%; top:${(point.y / height) * 100}%;"
+                        ></span>
+                      `
+                    )
+                    .join("")
+                : ""
+            }
+            ${
+              visibleTypes.diary
+                ? points
+                    .map(
+                      (point) => `
+                        <button
+                          class="chart-marker ${this.selectedDateKey === point.dateKey ? "is-active" : ""}"
+                          type="button"
+                          data-day-filter="${point.dateKey}"
+                          aria-label="${point.day}요일 기록 보기"
+                          style="left:${(point.x / width) * 100}%; top:${(point.y / height) * 100}%; background:${point.color};"
+                        >
+                          <span>${point.emoji}</span>
+                        </button>
+                        <div class="chart-day" style="left:${(point.x / width) * 100}%; top: calc(${(point.y / height) * 100}% + 36px);">
+                          ${point.day}
+                        </div>
+                      `
+                    )
+                    .join("")
+                : ""
+            }
           </div>
         </div>
       </div>
@@ -459,9 +694,31 @@ class DepressionScoreCard extends HTMLElement {
 
   renderExpandedChart() {
     const data = this.getExpandedData();
+    const visibleTypes = { diary: true, dialogue: true };
+    const expandedMoveLimit = this.getExpandedMoveLimit();
+    const expandedOffset = this.expandedWindowOffset[this.expandedRange];
+    const expandedMoveLabel = this.expandedRange === "year" ? "월 이동" : "주 이동";
+    const expandedPreviousLabel = this.expandedRange === "year" ? "이전 월 그래프 보기" : "이전 주 그래프 보기";
+    const expandedRecentLabel = this.expandedRange === "year" ? "최근 월 그래프 보기" : "최근 주 그래프 보기";
     const width = 720;
     const height = 220;
-    const { points, polyline } = createLineMarkup(data, width, height, 0);
+    const { points: diaryPoints, polyline: diaryPolyline } = createLineMarkup(data.diary, width, height, 0, {
+      stroke: "#2c2f31",
+      strokeWidth: 1.8,
+      className: "expanded-chart__path expanded-chart__path--diary",
+    });
+    const { points: dialoguePoints, polyline: dialoguePolyline } = createLineMarkup(
+      data.dialogue,
+      width,
+      height,
+      0,
+      {
+        stroke: "#5f8eea",
+        strokeWidth: 1.8,
+        className: "expanded-chart__path expanded-chart__path--dialogue",
+      }
+    );
+    const labelPoints = diaryPoints;
 
     return `
       <div class="modal ${this.isModalOpen ? "is-open" : ""}">
@@ -471,10 +728,34 @@ class DepressionScoreCard extends HTMLElement {
             <button class="modal__close" type="button" aria-label="닫기" data-close-modal>&times;</button>
           </div>
           <div class="modal__body">
-            <div class="range-tabs">
-              <button class="range-tab ${this.expandedRange === "month" ? "is-active" : ""}" type="button" data-range="month">월단위</button>
-              <button class="range-tab ${this.expandedRange === "year" ? "is-active" : ""}" type="button" data-range="year">년단위</button>
+            <div class="expanded-controls">
+              <div class="range-tabs">
+                <button class="range-tab ${this.expandedRange === "month" ? "is-active" : ""}" type="button" data-range="month">월간 보기</button>
+                <button class="range-tab ${this.expandedRange === "year" ? "is-active" : ""}" type="button" data-range="year">년간 보기</button>
+              </div>
+              <div class="expanded-chart__actions">
+                <button
+                  class="chart-nav-button"
+                  type="button"
+                  data-expanded-move="1"
+                  aria-label="${expandedPreviousLabel}"
+                  ${expandedOffset < expandedMoveLimit ? "" : "disabled"}
+                >
+                  ‹
+                </button>
+                <span class="chart-window-label">${expandedMoveLabel}</span>
+                <button
+                  class="chart-nav-button"
+                  type="button"
+                  data-expanded-move="-1"
+                  aria-label="${expandedRecentLabel}"
+                  ${expandedOffset > 0 ? "" : "disabled"}
+                >
+                  ›
+                </button>
+              </div>
             </div>
+            ${this.renderChartLegend(visibleTypes, "chart-legend expanded-chart__legend")}
             <div class="expanded-chart">
               <div class="expanded-chart__canvas">
                 <div class="expanded-chart__y">
@@ -484,9 +765,10 @@ class DepressionScoreCard extends HTMLElement {
                   <span>0</span>
                 </div>
                 <svg class="expanded-chart__line" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
-                  ${polyline}
+                  ${visibleTypes.diary ? diaryPolyline : ""}
+                  ${visibleTypes.dialogue ? dialoguePolyline : ""}
                 </svg>
-                ${points
+                ${labelPoints
                   .map(
                     (point) => `
                       ${
@@ -535,7 +817,7 @@ class DepressionScoreCard extends HTMLElement {
           </nav>
           ${
             this.selectedDateKey
-              ? `<p class="entry-filter-note">${WEEK_TREND.find((item) => item.dateKey === this.selectedDateKey)?.day}요일 기록만 보는 중</p>`
+              ? `<p class="entry-filter-note">${this.getCurrentWeekTrend().diary.find((item) => item.dateKey === this.selectedDateKey)?.day}요일 기록만 보는 중</p>`
               : ""
           }
           <div class="entry-list">
