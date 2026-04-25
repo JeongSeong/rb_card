@@ -251,7 +251,6 @@ const MONTH_TREND = buildDenseTrend(
     { label: "2주", score: 18 },
     { label: "3주", score: 7 },
     { label: "4주", score: 15 },
-    { label: "5주", score: 9 },
   ],
   6
 );
@@ -262,7 +261,6 @@ const DIALOGUE_MONTH_TREND = buildDenseTrend(
     { label: "2주", score: 16 },
     { label: "3주", score: 11 },
     { label: "4주", score: 18 },
-    { label: "5주", score: 12 },
   ],
   6
 );
@@ -285,6 +283,24 @@ const YEAR_TREND = buildDenseTrend(
   29
 );
 
+const MONTH_AXIS_LABELS = ["3월 1주", "3월 2주", "3월 3주", "3월 4주", "4월 1주", "4월 2주", "4월 3주", "4월 4주"];
+const YEAR_AXIS_LABELS = [
+  "2025.01",
+  "2025.02",
+  "2025.03",
+  "2025.04",
+  "2025.05",
+  "2025.06",
+  "2025.07",
+  "2025.08",
+  "2025.09",
+  "2025.10",
+  "2025.11",
+  "2025.12",
+  "2026.01",
+  "2026.02",
+];
+
 const DIALOGUE_YEAR_TREND = buildDenseTrend(
   [
     { label: "1월", score: 9 },
@@ -305,21 +321,24 @@ const DIALOGUE_YEAR_TREND = buildDenseTrend(
 
 const MONTH_WINDOW_STEP = 7;
 const MONTH_WINDOW_SIZE = MONTH_TREND.length;
-const MONTH_TREND_HISTORY = [...createShiftedTrend(MONTH_TREND, -2), ...MONTH_TREND];
+const MONTH_LABEL_WINDOW_SIZE = 4;
+const MONTH_TREND_HISTORY = [...createShiftedTrend(MONTH_TREND, -4), ...createShiftedTrend(MONTH_TREND, -2), ...MONTH_TREND];
 const DIALOGUE_MONTH_TREND_HISTORY = [
+  ...createShiftedTrend(DIALOGUE_MONTH_TREND, -3),
   ...createShiftedTrend(DIALOGUE_MONTH_TREND, -1),
   ...DIALOGUE_MONTH_TREND,
 ];
-const MAX_MONTH_WINDOW_OFFSET = Math.floor((MONTH_TREND_HISTORY.length - MONTH_WINDOW_SIZE) / MONTH_WINDOW_STEP);
+const MAX_MONTH_WINDOW_OFFSET = MONTH_AXIS_LABELS.length - MONTH_LABEL_WINDOW_SIZE;
 
 const YEAR_WINDOW_STEP = 30;
 const YEAR_WINDOW_SIZE = YEAR_TREND.length;
+const YEAR_LABEL_WINDOW_SIZE = 12;
 const YEAR_TREND_HISTORY = [...createShiftedTrend(YEAR_TREND, 2), ...YEAR_TREND];
 const DIALOGUE_YEAR_TREND_HISTORY = [
   ...createShiftedTrend(DIALOGUE_YEAR_TREND, -2),
   ...DIALOGUE_YEAR_TREND,
 ];
-const MAX_YEAR_WINDOW_OFFSET = Math.floor((YEAR_TREND_HISTORY.length - YEAR_WINDOW_SIZE) / YEAR_WINDOW_STEP);
+const MAX_YEAR_WINDOW_OFFSET = YEAR_AXIS_LABELS.length - YEAR_LABEL_WINDOW_SIZE;
 
 function sortByLatest(items) {
   return [...items].sort((left, right) => new Date(right.writtenAt) - new Date(left.writtenAt));
@@ -340,6 +359,13 @@ function shiftDateKey(dateKey, dayOffset) {
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function formatExpandedAxisLabel(range, labelIndex, offset) {
+  const labels = range === "year" ? YEAR_AXIS_LABELS : MONTH_AXIS_LABELS;
+  const windowSize = range === "year" ? YEAR_LABEL_WINDOW_SIZE : MONTH_LABEL_WINDOW_SIZE;
+  const startIndex = labels.length - windowSize - offset;
+  return labels[startIndex + labelIndex] || "";
 }
 
 function createLineMarkup(data, width, height, bottomPadding = 20, options = {}) {
@@ -703,7 +729,6 @@ class DepressionScoreCard extends HTMLElement {
     const visibleTypes = { diary: true, dialogue: true };
     const expandedMoveLimit = this.getExpandedMoveLimit();
     const expandedOffset = this.expandedWindowOffset[this.expandedRange];
-    const expandedMoveLabel = this.expandedRange === "year" ? "월 이동" : "주 이동";
     const expandedPreviousLabel = this.expandedRange === "year" ? "이전 월 그래프 보기" : "이전 주 그래프 보기";
     const expandedRecentLabel = this.expandedRange === "year" ? "최근 월 그래프 보기" : "최근 주 그래프 보기";
     const width = 720;
@@ -724,7 +749,12 @@ class DepressionScoreCard extends HTMLElement {
         className: "expanded-chart__path expanded-chart__path--dialogue",
       }
     );
-    const labelPoints = diaryPoints;
+    const labelSourcePoints = diaryPoints.filter((point) => point.isAnchor && point.label);
+    const labelPoints = labelSourcePoints.map((point, index) => ({
+      ...point,
+      displayLabel: formatExpandedAxisLabel(this.expandedRange, index, expandedOffset),
+      labelX: labelSourcePoints.length > 1 ? (index / (labelSourcePoints.length - 1)) * 100 : 50,
+    }));
 
     return `
       <div class="modal ${this.isModalOpen ? "is-open" : ""}">
@@ -749,7 +779,7 @@ class DepressionScoreCard extends HTMLElement {
                 >
                   ‹
                 </button>
-                <span class="chart-window-label">${expandedMoveLabel}</span>
+                <span class="chart-window-label">${this.expandedRange === "year" ? "월 이동" : "주 이동"}</span>
                 <button
                   class="chart-nav-button"
                   type="button"
@@ -774,19 +804,21 @@ class DepressionScoreCard extends HTMLElement {
                   ${visibleTypes.diary ? diaryPolyline : ""}
                   ${visibleTypes.dialogue ? dialoguePolyline : ""}
                 </svg>
-                ${labelPoints
-                  .map(
-                    (point) => `
-                      ${
-                        point.isAnchor && point.label
-                          ? `<div class="expanded-chart__label" style="left: calc(${(point.x / width) * 100}% + 54px); top: calc(${(point.y / height) * 100}% + 34px);">
-                              ${point.label}
-                            </div>`
-                          : ""
-                      }
-                    `
-                  )
-                  .join("")}
+                <div class="expanded-chart__x-labels">
+                  ${labelPoints
+                    .map(
+                      (point) => `
+                        ${
+                          point.isAnchor && point.label
+                            ? `<div class="expanded-chart__label" style="left:${point.labelX}%;">
+                                ${point.displayLabel}
+                              </div>`
+                            : ""
+                        }
+                      `
+                    )
+                    .join("")}
+                </div>
               </div>
             </div>
           </div>

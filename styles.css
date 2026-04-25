@@ -587,11 +587,20 @@ body {
   filter: drop-shadow(0 3px 5px rgba(95, 142, 234, 0.16));
 }
 
+.expanded-chart__x-labels {
+  position: absolute;
+  left: 76px;
+  right: 40px;
+  bottom: 12px;
+  height: 16px;
+}
+
 .expanded-chart__label {
   position: absolute;
   transform: translateX(-50%);
   color: #8d948b;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .expanded-chart__y {
